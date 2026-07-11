@@ -26,6 +26,7 @@ Core rules:
 7. Remove repetition.
 8. Mark unresolved ambiguity clearly.
 9. Artifact output: if the orchestrator provides an artifact path (normally state.md), use Write to save the full state there, and return as your final message only a one-line confirmation plus the next recommended agent. Use Write only for that artifact. If no path is provided, return the full state.
+10. Always end the state with a Resume Command section. It must let a fresh session continue without reading any chat history.
 
 Return your result in this exact structure:
 
@@ -74,3 +75,7 @@ Questions still unresolved.
 ## Next Recommended Agent
 
 Which agent should run next and why.
+
+## Resume Command
+
+The exact instruction to continue in a fresh session: task id (and epic id if any), current phase, next agent to launch, and the artifacts to read first (normally this file plus at most one or two others). Written so a new session needs nothing else to resume.

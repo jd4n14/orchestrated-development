@@ -60,11 +60,14 @@ Or ask for a full orchestration of a ticket, refactor, migration, or bug in a cr
 
 The orchestrator will:
 
-1. **Triage** the task (`LIGHT` / `STANDARD` / `FULL`)
+1. **Triage** the task (`LIGHT` / `STANDARD` / `FULL` / `EPIC`)
 2. Write a **brief** and create the task folder
 3. Launch only the agents required for that triage level
 4. Gate progress on artifacts and review verdicts
-5. Finish with a **final audit** before claiming completion
+5. **Checkpoint** state at every gate so the session can be cut and resumed cleanly
+6. Finish with a **final audit** before claiming completion
+
+Long features get `EPIC` triage: the feature is decomposed into a roadmap of LIGHT/STANDARD sub-tasks, executed **one per session**, with cross-task memory in `.ai/epics/<epic-id>/` — no single session ever holds the whole feature. See [docs/epics.md](docs/epics.md).
 
 ## Workflow at a glance
 
@@ -76,15 +79,17 @@ Triage → Brief → Explore → Impact → Plan → Plan review
 
 | Phase | Agent | Artifact |
 |-------|--------|----------|
-| Explore | `task-explorer` | `exploration.md` |
+| Explore | `task-explorer` | `exploration.md` + `context-pack.md` |
 | Impact | `impact-analyzer` | `impact.md` |
-| Plan | `task-planner` | `plan.md` |
+| Plan | `task-planner` | `plan.md` + `plan/phase-N.md` |
 | Plan review | `plan-critic` | `plan-review.md` |
 | Characterization | `characterization-test-designer` | `characterization-tests.md` |
 | Implement | `implementation-agent` | `implementation-handoff.md` |
 | Review | `review-agent` | `review.md` |
-| Compress | `state-compressor` | `state.md` |
+| Compress | `state-compressor` | `state.md` (+ Resume Command) |
 | Final audit | `final-orchestrator-auditor` | `final-audit.md` |
+
+Decision agents (planner, critic, reviewer, auditor) inherit the session model — run sessions with your strongest reasoning model; volume agents stay on cheaper tiers. See [docs/agents.md](docs/agents.md#roster).
 
 Full detail: [docs/workflow.md](docs/workflow.md) · Agents: [docs/agents.md](docs/agents.md) · Artifacts: [docs/artifacts.md](docs/artifacts.md)
 
@@ -120,7 +125,8 @@ Full detail: [docs/workflow.md](docs/workflow.md) · Agents: [docs/agents.md](do
 4. **Label claims**: `CONFIRMED` / `INFERRED` / `UNKNOWN`
 5. **Characterization before** risky legacy changes
 6. **Evidence before** declaring completion
-7. **Context budget**: short agent summaries, full reports on disk
+7. **Context budget**: short agent summaries, full reports on disk, one context pack per task instead of per-agent convention re-reads
+8. **Sessions are disposable**: checkpoints + Resume Commands make any session safe to cut; epics never fit in one session by design
 
 ## When to use it
 
@@ -136,6 +142,7 @@ Full detail: [docs/workflow.md](docs/workflow.md) · Agents: [docs/agents.md](do
 
 - [Installation](docs/installation.md)
 - [Workflow](docs/workflow.md)
+- [Epics (long features)](docs/epics.md)
 - [Agents](docs/agents.md)
 - [Artifacts](docs/artifacts.md)
 - [Contributing / customizing](docs/contributing.md)

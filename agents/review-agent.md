@@ -29,7 +29,7 @@ Core rules:
 9. Be skeptical of “looks fine”.
 10. Verify evidence yourself. Use Bash only to gather evidence: git diff and git log to see the actual changes, and the repo's own lint, test, and typecheck commands to confirm claimed results. Never use Bash to modify files, commit, or fix anything.
 11. Do not trust the implementation handoff's claims; re-run the verification commands the repo defines (from its docs and package scripts) and compare against the handoff.
-12. Context protocol: before reviewing code inside a repository, read the workspace-level rules (root CLAUDE.md or equivalent) and the repo's CLAUDE.md / AGENTS.md if they exist, and flag convention violations. Declare in your report which documents you read.
+12. Context protocol: before reviewing code inside a repository, read the task's context-pack.md when provided (falling back to the workspace-level rules and the repo's CLAUDE.md / AGENTS.md if they exist), and flag convention violations. Declare in your report which sources you used.
 13. Artifact output: if the orchestrator provides an artifact path, use Write to save the full review there, and return as your final message only: the verdict, findings of high or critical severity in one line each, and the recommendation. Use Write only for that artifact. If no path is provided, return the full review.
 
 Focus on:

@@ -7,17 +7,30 @@ Artifacts under `.ai/tasks/<task-id>/` are the **source of truth**. Chat history
 | File | Owner | Purpose |
 |------|-------|---------|
 | `brief.md` | Orchestrator | Goal, scope, triage, DoD, constraints |
+| `context-pack.md` | task-explorer | Distilled conventions, file map, verification commands, landmines |
 | `exploration.md` | task-explorer | Facts, inferences, unknowns, flows |
 | `impact.md` | impact-analyzer | Blast radius, risks, characterization need |
 | `plan.md` | task-planner | Phased executable plan |
+| `plan/phase-N.md` | task-planner | Self-contained per-phase input for the implementer |
 | `plan-review.md` | plan-critic | Plan gate verdict + findings |
 | `characterization-tests.md` | characterization-test-designer | What was frozen and how |
 | `implementation-handoff.md` | implementation-agent | What changed, tests, deviations |
 | `review.md` | review-agent | Implementation gate verdict |
-| `state.md` | state-compressor | Compressed operational memory |
+| `state.md` | state-compressor | Compressed operational memory + Resume Command |
 | `final-audit.md` | final-orchestrator-auditor | Merge readiness |
 
 Not every file is required for every triage level. LIGHT tasks may skip exploration, impact, plan-critic, and characterization when risk is low — document the skip and why.
+
+## Epic set
+
+EPIC-triage work adds `.ai/epics/<epic-id>/` — see [epics.md](epics.md):
+
+| File | Owner | Purpose |
+|------|-------|---------|
+| `epic-brief.md` | Orchestrator | Feature-level goal, scope, DoD |
+| `context-pack.md` | task-explorer | Epic-level pack, reused by every sub-task |
+| `roadmap.md` | task-planner | Sub-task decomposition with dependencies, sizing, risk |
+| `epic-state.md` | Orchestrator / state-compressor | Cross-task memory + Resume Command |
 
 ## Design rules
 
@@ -35,7 +48,7 @@ Not every file is required for every triage level. LIGHT tasks may skip explorat
 ## Objective
 ## User context
 ## Triage
-- Level: LIGHT | STANDARD | FULL
+- Level: LIGHT | STANDARD | FULL | EPIC
 - Justification:
 ## Affected repos
 ## Scope
@@ -63,7 +76,10 @@ Not every file is required for every triage level. LIGHT tasks may skip explorat
 ## Pending Work
 ## Next Recommended Agent
 ## Open UNKNOWNs
+## Resume Command
 ```
+
+`Resume Command` is the exact instruction for a fresh session to continue — task id, current phase, next agent, artifacts to read — so no chat history is ever needed to resume.
 
 ## Verdict vocabulary
 

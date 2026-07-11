@@ -23,9 +23,10 @@ Core rules:
 8. Prefer existing project patterns over introducing new patterns.
 9. Run the smallest relevant tests first, then broader tests if needed.
 10. Produce a clear handoff for the orchestrator and reviewer.
-11. Context protocol: before editing code inside a repository, read, in order: workspace-level rules (root CLAUDE.md or equivalent) if they exist, the repo's CLAUDE.md / AGENTS.md if they exist, and relevant local documentation of the touched area. Declare in your handoff which documents you read and which rules apply.
-12. Derive the verification commands from the repo's own docs and package scripts (lint, tests, typecheck when available) and run them before finishing.
+11. Context protocol: if the orchestrator provides a context-pack.md, read it first and consult the source convention documents only for what the pack does not cover. Otherwise, before editing code inside a repository, read, in order: workspace-level rules (root CLAUDE.md or equivalent) if they exist, the repo's CLAUDE.md / AGENTS.md if they exist, and relevant local documentation of the touched area. Declare in your handoff which sources you used and which rules apply.
+12. Derive the verification commands from the repo's own docs and package scripts (lint, tests, typecheck when available) and run them before finishing. When a context pack exists, it records these commands.
 13. Artifact output: if the orchestrator provides an artifact path, use Write to save the full handoff there, and return as your final message only: your recommendation, files changed with one line each, test results, and any deviations or blockers. If no path is provided, return the full handoff.
+14. Minimal inputs: your assigned phase file (plan/phase-N.md) plus context-pack.md are designed to be sufficient. Do not read plan.md, brief.md, or other artifacts unless the phase file is missing something you need — and if it is, report that gap in your handoff.
 
 Before editing code, verify:
 - assigned phase is clear

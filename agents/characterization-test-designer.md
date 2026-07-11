@@ -23,7 +23,7 @@ Core rules:
 8. If tests cannot be created without production refactor, stop and report why.
 9. Run relevant tests when possible.
 10. Return evidence, not confidence.
-11. Context protocol: before writing tests inside a repository, read, in order: workspace-level rules (root CLAUDE.md or equivalent) if they exist, the repo's CLAUDE.md / AGENTS.md if they exist, and the conventions of its existing test suite. Follow the repo's test framework, naming, and patterns. Declare in your report which documents you read.
+11. Context protocol: if the orchestrator provides a context-pack.md, read it first and consult the source documents only for what the pack does not cover. Otherwise read, in order: workspace-level rules (root CLAUDE.md or equivalent) if they exist, the repo's CLAUDE.md / AGENTS.md if they exist, and the conventions of its existing test suite. Follow the repo's test framework, naming, and patterns. Declare in your report which sources you used.
 12. Artifact output: if the orchestrator provides an artifact path, use Write to save the full report there, and return as your final message only: your recommendation, the tests added with one line each, and any blockers. If no path is provided, return the full report.
 
 When designing tests, prioritize:

@@ -10,7 +10,7 @@ All agent definitions live in [`agents/`](../agents/).
 |-------|------|--------------------|--------------|
 | [`task-explorer`](../agents/task-explorer.md) | Reduce ambiguity before planning | sonnet | No (read-only + report) |
 | [`impact-analyzer`](../agents/impact-analyzer.md) | Blast radius, risks, characterization need | sonnet | No |
-| [`task-planner`](../agents/task-planner.md) | Phased executable plan | sonnet | No |
+| [`task-planner`](../agents/task-planner.md) | Phased executable plan | default | No |
 | [`plan-critic`](../agents/plan-critic.md) | Break the plan before coding | default | No |
 | [`characterization-test-designer`](../agents/characterization-test-designer.md) | Freeze current behavior with tests | sonnet | Tests only |
 | [`implementation-agent`](../agents/implementation-agent.md) | Implement **one** approved phase | sonnet | Yes |
@@ -20,11 +20,13 @@ All agent definitions live in [`agents/`](../agents/).
 
 Model hints are preferences in frontmatter; Claude Code may map them differently depending on your account settings.
 
+The tiering is deliberate: **decision agents** (planner, critic, reviewer, auditor) use `default` — they inherit the session model, so run orchestration sessions with the strongest reasoning model available (Opus / Fable-class). **Volume agents** (explorer, impact, characterization, implementer) stay on sonnet; the orchestrator overrides the implementer to the session model for phases the plan marks as `hard`. A stronger model at decision points avoids gate correction cycles, and each avoided cycle saves two or more agent launches.
+
 ## task-explorer
 
 **When:** Task is ambiguous; area unclear; hidden business rules possible; path not obvious.
 
-**Outputs:** `exploration.md` with CONFIRMED / INFERRED / UNKNOWN, affected flows, risks, questions.
+**Outputs:** `exploration.md` with CONFIRMED / INFERRED / UNKNOWN, affected flows, risks, questions. Also `context-pack.md`: the distilled conventions, file map, verification commands, and landmines that later agents read instead of re-deriving repo context.
 
 **Does not:** implement, refactor, or produce the final architecture plan.
 
@@ -40,7 +42,7 @@ Model hints are preferences in frontmatter; Claude Code may map them differently
 
 **When:** Exploration + impact are sufficient; ready to plan.
 
-**Outputs:** `plan.md` — small phases with scope, files, tests, evidence, stop conditions, agent handoffs.
+**Outputs:** `plan.md` — small phases with difficulty (routine/hard), scope, files, tests, evidence, stop conditions, agent handoffs — plus one self-contained `plan/phase-N.md` per phase (phase file + context pack = full implementer input). For EPIC triage it produces `roadmap.md` (sub-task decomposition) instead.
 
 **Does not:** implement. If UNKNOWNs remain, adds validation steps first.
 
@@ -83,9 +85,9 @@ Model hints are preferences in frontmatter; Claude Code may map them differently
 
 ## state-compressor
 
-**When:** After major phases, long agent chains, or growing context.
+**When:** At every checkpoint — after plan approval, every 2 implementation phases, after gate correction cycles, before ending a session.
 
-**Outputs:** `state.md` — facts, decisions, blockers, risks, remaining work. No deep analysis, no new decisions.
+**Outputs:** `state.md` — facts, decisions, blockers, risks, remaining work, ending with a **Resume Command** so a fresh session can continue without chat history. No deep analysis, no new decisions.
 
 ## final-orchestrator-auditor
 
@@ -111,7 +113,7 @@ If the orchestrator passes an artifact path:
 
 ### Context protocol
 
-Before reading or editing source inside a repo, load:
+The **first** repo-working agent (normally the explorer) loads full context:
 
 1. Workspace rules
 2. Repo `CLAUDE.md` / `AGENTS.md`
@@ -119,7 +121,7 @@ Before reading or editing source inside a repo, load:
 4. Spec systems when required
 5. Then source
 
-Declare which documents were read in the report/handoff.
+…and distills it into `context-pack.md`. Later agents read the pack first and fall back to source documents only for gaps. Declare which sources were used in the report/handoff.
 
 ### Evidence over confidence
 

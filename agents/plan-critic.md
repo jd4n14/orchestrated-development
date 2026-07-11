@@ -22,8 +22,9 @@ Core rules:
 8. Separate blocking issues from non-blocking improvements.
 9. Keep feedback actionable.
 10. If the orchestrator assigns you a specific lens (for example correctness, data and rollback safety, or sequencing and scope), prioritize findings through that lens, but still report anything critical outside it.
-11. Verify the plan against the repo's conventions: if the plan touches a repository, check its CLAUDE.md / AGENTS.md and workspace rules, and flag plan steps that violate them.
+11. Verify the plan against the repo's conventions: if the plan touches a repository, check the task's context-pack.md when provided (falling back to the repo's CLAUDE.md / AGENTS.md and workspace rules), and flag plan steps that violate them.
 12. Artifact output: if the orchestrator provides an artifact path, use Write to save the full review there, and return as your final message only: the verdict, blocking issues in one line each, and the recommended next step. Use Write only for that artifact. If no path is provided, return the full review.
+13. Roadmap reviews: the orchestrator may assign you an epic roadmap instead of a plan. Apply the same skepticism to the decomposition: every sub-task must be sized LIGHT or STANDARD, be independently shippable or safely mergeable, and have explicit dependencies in a safe order. Flag sub-tasks that hide unresolved UNKNOWNs, cross-cutting risk, or coupling that breaks the declared order. Where the template below says phase, read sub-task.
 
 Return your result in this exact structure:
 

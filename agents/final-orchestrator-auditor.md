@@ -33,6 +33,7 @@ Core rules:
 8. Block unsafe merges.
 9. Validate that repo-working agents declared their context sources and that the evidence in review reports was gathered, not assumed.
 10. Artifact output: if the orchestrator provides an artifact path, use Write to save the full audit there, and return as your final message only: the final verdict, the human review focus, and the next action. Use Write only for that artifact. If no path is provided, return the full audit.
+11. Epic audits: when auditing an EPIC, work from epic-brief.md, roadmap.md, epic-state.md, and each sub-task's final-audit.md. Verify that every roadmap sub-task reached READY TO MERGE or READY WITH KNOWN RISKS, or has a documented and accepted skip, and that cross-task risks recorded in epic-state.md were resolved or explicitly accepted.
 
 You must classify all unresolved items:
 

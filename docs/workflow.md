@@ -9,9 +9,11 @@ Every non-trivial task gets a folder:
 ```text
 .ai/tasks/<task-id>/
   brief.md
+  context-pack.md
   exploration.md
   impact.md
   plan.md
+  plan/phase-N.md
   plan-review.md
   characterization-tests.md
   implementation-handoff.md
@@ -22,6 +24,8 @@ Every non-trivial task gets a folder:
 
 If no id is given, use a short kebab-case name derived from the task.
 
+EPIC-triage work adds an epic folder (`epic-brief.md`, `context-pack.md`, `roadmap.md`, `epic-state.md`) — see [epics.md](epics.md).
+
 ### Resume protocol
 
 If `.ai/tasks/<task-id>/` already exists:
@@ -30,6 +34,8 @@ If `.ai/tasks/<task-id>/` already exists:
 2. Load only pending / relevant artifacts
 3. Continue from the phase indicated by state
 4. Do not re-run approved phases unless new information changes the task
+
+If the task belongs to an epic, read `epic-state.md` first. Both state files end with a **Resume Command** — execute it instead of reconstructing context from chat.
 
 ## Triage levels
 
@@ -40,8 +46,9 @@ Classify before deep work. Record level + justification in `brief.md`.
 | **LIGHT** | Well-understood area, good coverage, single repo, no critical flows | brief → short plan → implement → review |
 | **STANDARD** | Default | Full workflow; skip characterization unless impact requires it |
 | **FULL** | Legacy, critical business flows, multi-repo, unknown coverage, irreversible data | Every step |
+| **EPIC** | Long feature / multi-session change; plan would exceed ~6 phases | [Epic Protocol](epics.md): decompose into LIGHT/STANDARD sub-tasks, one per session |
 
-Agents may **escalate** triage when they discover risk. Never **downgrade** without user approval.
+Agents may **escalate** triage when they discover risk — including FULL → EPIC when the plan outgrows its sizing. Never **downgrade** without user approval.
 
 ## Phases
 
@@ -67,7 +74,8 @@ Ask only minimum clarifying questions if the request is too vague.
 
 Use when ambiguity, unclear area, hidden rules, or non-obvious path.
 
-- Multi-repo: one explorer **per repo**, launched concurrently, then consolidate into `exploration.md`
+- Produces `exploration.md` **and** `context-pack.md` (distilled conventions, file map, verification commands, landmines) — later agents read the pack instead of re-deriving repo conventions
+- Multi-repo: one explorer **per repo**, launched concurrently, then consolidate into `exploration.md` and one pack with per-repo sections
 - Do not plan if exploration has **blocking UNKNOWNs**
 
 ### 3. Impact → `impact-analyzer`
@@ -82,11 +90,13 @@ After exploration, before planning.
 
 Phased plan in `plan.md`. Each phase needs:
 
-- objective, scope, out of scope
+- objective, **difficulty (routine / hard)**, scope, out of scope
 - expected files/modules
 - steps, required tests, required evidence
 - risks, stop conditions
 - suggested agent, handoff requirements
+
+The planner also shards the plan: each phase becomes a self-contained `plan/phase-N.md`. Phase file + context pack must be enough for the implementer — no other artifact required.
 
 ### 5. Plan review → `plan-critic`
 
@@ -107,7 +117,8 @@ Freeze **current** behavior. If tests cannot be added safely → stop and escala
 ### 7. Implementation → `implementation-agent`
 
 - **One phase at a time**
-- Minimal context (phase + excerpts + stop conditions)
+- Minimal context: `plan/phase-N.md` + `context-pack.md` + stop conditions — not the full plan
+- Phases marked **hard** launch with the session model (model override); routine phases use the agent default
 - No scope expansion
 - Update `implementation-handoff.md`
 
@@ -119,9 +130,16 @@ After each implementation phase.
 - Re-verify evidence (diff, lint, tests, typecheck as defined by the repo)
 - Same verdict model and gate iteration limit as plan review
 
-### 9. State compression → `state-compressor`
+### 9. State compression → `state-compressor` (checkpoints)
 
-After major phases or when context grows large. Produces `state.md` — operational memory for the next steps.
+Mandatory on long tasks, at every checkpoint:
+
+- after plan approval
+- after every 2 implementation phases
+- after any gate correction cycle
+- before ending a session
+
+Produces `state.md` — operational memory ending with a **Resume Command**. After each checkpoint, the session can be cut: `/clear` or a fresh session resumes from `state.md`. Prefer clean-session resumes over letting one session grow until auto-compaction.
 
 ### 10. Final audit → `final-orchestrator-auditor`
 
@@ -146,7 +164,7 @@ If a plan/implementation depends on UNKNOWN or risky INFERRED claims → validat
 
 ## Context loading protocol
 
-When work touches a repository, agents load context **in this order** before source code:
+Only the **first** repo-working agent (normally the explorer) loads full context, in this order, before source code:
 
 1. Workspace-level rules (root `CLAUDE.md` / equivalent)
 2. Repo `CLAUDE.md` / `AGENTS.md`
@@ -154,7 +172,7 @@ When work touches a repository, agents load context **in this order** before sou
 4. Formal spec system (e.g. `openspec/`) when the task needs a formal proposal
 5. Related source code
 
-Agents declare which convention docs they read. Verification evidence comes from each repo’s own scripts (lint, tests, typecheck).
+It distills the result into `context-pack.md`. Every later agent reads the pack first and goes back to source documents only for what the pack misses. Agents declare which sources they used. Verification evidence comes from each repo’s own scripts (lint, tests, typecheck), recorded in the pack.
 
 ## Agent launch rules
 
@@ -168,7 +186,19 @@ Each launch must specify:
 - evidence requirements
 - context loading instructions when working inside a repo
 
-Agents write the **full report** to the artifact and return a **short summary** (verdict, key findings, blockers). The orchestrator should not pull full reports into chat unless a gate needs the detail.
+Agents write the **full report** to the artifact and return a **short summary** (verdict, key findings, blockers — max 15 lines). The orchestrator should not pull full reports into chat unless a gate needs the detail.
+
+### Model tiering
+
+Decision agents multiply their errors downstream; volume agents do not.
+
+| Tier | Agents | Model |
+|------|--------|-------|
+| Decision | `task-planner`, `plan-critic`, `review-agent`, `final-orchestrator-auditor` | Inherit session model — run sessions with the strongest reasoning model available |
+| Volume | `task-explorer`, `impact-analyzer`, `characterization-test-designer`, `implementation-agent` | Mid-tier (sonnet) by default; implementer overridden to session model for **hard** phases |
+| Mechanical | `state-compressor` | Cheapest (haiku) |
+
+A better plan avoids correction cycles; each avoided cycle saves two or more agent launches — the strong model at decision points pays for itself.
 
 ### Parallelism
 

@@ -1,7 +1,7 @@
 {
   "name": "orchestrated-development",
   "description": "Structured multi-agent development workflow for ambiguous, risky, legacy, or medium-to-large engineering tasks. Orchestrates exploration, impact analysis, planning, characterization tests, implementation, review, compression, and final audit.",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": {
     "name": "Diego Parra",
     "url": "https://github.com/jd4n14"
