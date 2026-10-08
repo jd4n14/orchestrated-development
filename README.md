@@ -7,7 +7,7 @@ Turns ambiguous, risky, legacy, or medium-to-large engineering tasks into a cont
 | | |
 |---|---|
 | **Skill** | `orchestrated-development` — technical orchestrator (does not implement code) |
-| **Agents** | 9 specialized subagents for explore → plan → implement → review → audit |
+| **Agents** | 10 specialized subagents for explore → plan → implement → review → audit |
 | **Target** | [Claude Code](https://docs.anthropic.com/en/docs/claude-code) |
 
 ## Why this exists
@@ -74,7 +74,7 @@ Long features get `EPIC` triage: the feature is decomposed into a roadmap of LIG
 ```text
 Triage → Brief → Explore → Impact → Plan → Plan review
        → Characterization (if needed) → Implement (per phase)
-       → Review → Compress state → Final audit
+       → Contract check → Review → Compress state → Final audit
 ```
 
 | Phase | Agent | Artifact |
@@ -85,11 +85,12 @@ Triage → Brief → Explore → Impact → Plan → Plan review
 | Plan review | `plan-critic` | `plan-review.md` |
 | Characterization | `characterization-test-designer` | `characterization-tests.md` |
 | Implement | `implementation-agent` | `implementation-handoff.md` |
+| Contract check | `contract-checker` | `contract-check.md` |
 | Review | `review-agent` | `review.md` |
 | Compress | `state-compressor` | `state.md` (+ Resume Command) |
 | Final audit | `final-orchestrator-auditor` | `final-audit.md` |
 
-Decision agents (planner, critic, reviewer, auditor) inherit the session model — run sessions with your strongest reasoning model; volume agents stay on cheaper tiers. See [docs/agents.md](docs/agents.md#roster).
+Each role is defined by what it may decide (product and data, architecture, local design), and the model is a parameter of the role: recon reports decisions but never takes them, the executor receives closed decisions and stops on contradictions, and the reviewer attacks the change from a clean context. Gate decisions run on the session model (your strongest reasoning model), volume work on mid-tier with escalation for hard or critical phases, mechanical gates on the cheapest tier. See [role permissions](docs/workflow.md#role-permissions) and [model assignment](docs/workflow.md#model-assignment).
 
 Full detail: [docs/workflow.md](docs/workflow.md) · Agents: [docs/agents.md](docs/agents.md) · Artifacts: [docs/artifacts.md](docs/artifacts.md)
 
@@ -104,6 +105,7 @@ Full detail: [docs/workflow.md](docs/workflow.md) · Agents: [docs/agents.md](do
 │   ├── plan-critic.md
 │   ├── characterization-test-designer.md
 │   ├── implementation-agent.md
+│   ├── contract-checker.md
 │   ├── review-agent.md
 │   ├── state-compressor.md
 │   └── final-orchestrator-auditor.md

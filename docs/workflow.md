@@ -118,19 +118,31 @@ Freeze **current** behavior. If tests cannot be added safely → stop and escala
 
 - **One phase at a time**
 - Minimal context: `plan/phase-N.md` + `context-pack.md` + stop conditions — not the full plan
-- Phases marked **hard** launch with the session model (model override); routine phases use the agent default
+- Executor and model come from [model assignment](#model-assignment), using the phase's **difficulty** (routine / hard) and **risk** (normal / critical); the executor's permissions come from [role permissions](#role-permissions) whatever the model
 - No scope expansion
 - Update `implementation-handoff.md`
 
-### 8. Review → `review-agent`
+### 8. Contract check → `contract-checker`
 
-After each implementation phase.
+After each implementation phase, before review, at every triage level. Cheapest gate in the workflow.
 
-- Compare handoff + diff against plan and risks
-- Re-verify evidence (diff, lint, tests, typecheck as defined by the repo)
+- Verifies every cross-boundary reference in the diff exists: HTTP calls ↔ routes, tables/columns ↔ real schema (read-only), queue/event producers ↔ consumers, config keys ↔ declarations
+- Uses the phase file's **Contracts** field as checklist and the context pack's **Contract Sources** section to find definitions
+- Runs lint / typecheck / tests and reports only failures, plus a diff fingerprint
+- Compares the files in the diff with the phase's **allowed files**; any file outside it is `OUT OF SCOPE` and fails the check
+- `FAIL` → straight back to the implementer; no review is spent on it. Fix cycles count toward the implementation gate limit
+
+### 9. Review → `review-agent`
+
+After each phase passes its contract check.
+
+- Adversarial, from a clean context: tries to break the change (counterexamples, real data shapes, other callers, new tests run against the base commit)
+- Receives the plan's decisions and the diff; the handoff only as claims to reproduce, never the implementer's reasoning or earlier verdicts
+- Findings carry evidence and a status (`DEFECT` / `NEEDS CONTEXT`); it states expected behavior, never patches
+- Reuse the contract check's command results when its diff fingerprint still matches; otherwise re-verify (diff, lint, tests, typecheck as defined by the repo)
 - Same verdict model and gate iteration limit as plan review
 
-### 9. State compression → `state-compressor` (checkpoints)
+### 10. State compression → `state-compressor` (checkpoints)
 
 Mandatory on long tasks, at every checkpoint:
 
@@ -141,7 +153,7 @@ Mandatory on long tasks, at every checkpoint:
 
 Produces `state.md` — operational memory ending with a **Resume Command**. After each checkpoint, the session can be cut: `/clear` or a fresh session resumes from `state.md`. Prefer clean-session resumes over letting one session grow until auto-compaction.
 
-### 10. Final audit → `final-orchestrator-auditor`
+### 11. Final audit → `final-orchestrator-auditor`
 
 Before claiming completion. Allowed “done” verdicts:
 
@@ -188,17 +200,51 @@ Each launch must specify:
 
 Agents write the **full report** to the artifact and return a **short summary** (verdict, key findings, blockers — max 15 lines). The orchestrator should not pull full reports into chat unless a gate needs the detail.
 
-### Model tiering
+### Role permissions
 
-Decision agents multiply their errors downstream; volume agents do not.
+A role is defined by what it may **decide**, not by what a model is good at. The model is a parameter of the role; a stronger model gets no extra permissions. Permissions are enforced with tools and output formats (read-only roles have no edit tools; every report has a place to hand a decision upward), not only with instructions.
 
-| Tier | Agents | Model |
-|------|--------|-------|
-| Decision | `task-planner`, `plan-critic`, `review-agent`, `final-orchestrator-auditor` | Inherit session model — run sessions with the strongest reasoning model available |
-| Volume | `task-explorer`, `impact-analyzer`, `characterization-test-designer`, `implementation-agent` | Mid-tier (sonnet) by default; implementer overridden to session model for **hard** phases |
-| Mechanical | `state-compressor` | Cheapest (haiku) |
+**Decision levels**
 
-A better plan avoids correction cycles; each avoided cycle saves two or more agent launches — the strong model at decision points pays for itself.
+- **D1 Product and data** — business rules, user-visible behavior, whether existing data is correct or intentional, data repairs. Owner: the user; the orchestrator proposes options.
+- **D2 Architecture and contracts** — the approach to a fix, module boundaries, schema, public APIs, cross-repo contracts. Owner: the orchestrator, through planner and plan gate.
+- **D3 Local design** — helper extraction, naming, test structure, inside the allowed files. Owner: the executor.
+
+| Role | Agents | May | Must not | Stops and escalates when |
+|------|--------|-----|----------|--------------------------|
+| Recon | `task-explorer`, `impact-analyzer` | Read code, docs, read-only data; label facts; list options | Make D1/D2 decisions; choose the solution; judge whether data is intentional | Evidence points to a decision → **Decisions Needed**, options and evidence, no choice |
+| Planner | `task-planner` | D2 decisions; close every decision the executor needs; name allowed files | D1 decisions; leave D2 open for the executor | A business rule is ambiguous |
+| Gate | `plan-critic`, `final-orchestrator-auditor` | Approve, reject, demand changes | Edit plans or code | The verdict depends on a D1 decision |
+| Characterizer | `characterization-test-designer` | Freeze current behavior in tests | Change production code | Current behavior looks wrong → record it, keep the test faithful |
+| Executor | `implementation-agent` or external | D3 inside the allowed files | Reinterpret scope; touch other files; change D1/D2; commit | Contradiction, impossibility, or a false fact in the phase. Critical risk → stop; normal risk → narrower reading + report |
+| Contract checker | `contract-checker` | Verify references, commands, and diff files vs allowed files | Judge design or intent; fix | — |
+| Adversarial reviewer | `review-agent` | Break the change: counterexamples, base-commit tests, re-run every claim | Patch, redesign, continue the implementer's work, review its own phase | A finding needs context it lacks → **NEEDS CONTEXT** |
+| Compressor | `state-compressor` | Summarize artifacts | Add decisions absent from the artifacts | — |
+| Orchestrator | session | D2; integrate, verify, commit when asked | D1 without the user; push D2 onto an executor via a vague brief | — |
+
+Facts in a brief or phase file (counts, names, paths, expected values) are **claims**: any role that can verify one cheaply does so and reports a false one instead of copying it.
+
+**Clean context for the reviewer:** it receives the phase file, the plan's decisions (including other repos' phases), `contract-check.md`, the diff, and the handoff's claims labelled as claims. Never the implementer's reasoning, the orchestrator's opinion, or earlier verdicts. Clean of narrative, not of the contract.
+
+### Model assignment
+
+Decision roles multiply their errors downstream; volume roles do not; mechanical roles only need to be exact. **session** = the orchestration session's model (run it with the strongest reasoning model available), **mid** = sonnet, **cheap** = haiku, **external** = a non-Claude coding agent driven by an executor skill (e.g. a Cursor delegate), only when one is installed.
+
+| Role | Default | Escalate to | Escalate when |
+|------|---------|-------------|---------------|
+| Orchestrator, Gate | session | — | — |
+| Recon | mid | session | exploration of a FULL task returned blocking contradictions |
+| Planner | mid | session | triage FULL, or an EPIC roadmap |
+| Characterizer | mid | session | the flow under test is critical risk |
+| Executor | external, else mid | session | phase is hard **and** critical; hard alone → executor's strongest setting or session |
+| Contract checker | cheap | — | — |
+| Adversarial reviewer | mid | session | phase is hard or critical, or triage FULL |
+| Compressor | cheap | — | — |
+
+- The cheap tier may also fill Recon for evidence-only questions (counts, lookups, tracing a value); the orchestrator still synthesizes before anything is decided.
+- Escalate with the model override at launch. Record executor and model per phase in `state.md`.
+- **Cross-family review:** if a Claude model implemented a critical phase, the external executor may add a second read-only review. If the implementer was external, `review-agent` already is the second family. The reviewer is never the instance that implemented the phase.
+- Never downgrade a row below its default without user approval — one avoided correction cycle saves more than a cheaper model on a decision step.
 
 ### Parallelism
 

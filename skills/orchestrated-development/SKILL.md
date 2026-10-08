@@ -67,6 +67,7 @@ context-pack.md is a one-to-two page distillation per affected repo, produced by
 - key file map: entry points, modules, and tests relevant to the task
 - verification commands (lint, test, typecheck) as defined by the repo
 - known landmines from exploration: legacy behavior, coupling, gotchas
+- contract sources: where HTTP routes, database schema (migrations, models), queue and event names, and config or environment declarations are defined, plus the read-only command to inspect the real database schema when the user has authorized one. contract-checker depends on this section.
 
 Pass the pack path to every subsequent agent instead of repeating full context loading instructions. For multi-repo tasks, use one pack with clearly named per-repo sections.
 
@@ -87,6 +88,7 @@ For every non-trivial task, create or use a task folder:
   plan-review.md
   characterization-tests.md
   implementation-handoff.md
+  contract-check.md
   review.md
   state.md
   final-audit.md
@@ -143,7 +145,7 @@ Workflow
 
 Classify the task before creating artifacts:
 
-- LIGHT: well-understood area, existing coverage, single repo, no critical flows. Run: brief, short plan, implementation, review. Skip exploration, impact analysis, plan review, and characterization unless a step reveals risk.
+- LIGHT: well-understood area, existing coverage, single repo, no critical flows. Run: brief, short plan, implementation, contract check, review. Skip exploration, impact analysis, plan review, and characterization unless a step reveals risk.
 - STANDARD: the default. Run the full workflow, but skip characterization tests if the impact report says they are not required.
 - FULL: legacy code, critical business flows (billing, payments, state machines, external integrations), multiple repos, missing or unknown coverage, or irreversible data changes. Run every step.
 - EPIC: a long feature or multi-session change: days of work, a plan that would exceed roughly 6 implementation phases, or new surface area across repos. Do not run the single-task workflow; run the Epic Protocol and decompose into LIGHT/STANDARD sub-tasks.
@@ -188,6 +190,8 @@ The explorer must produce exploration.md and context-pack.md — pass both artif
 
 If the task affects more than one repo, launch one task-explorer per repo in a single message so they run concurrently, then consolidate results into exploration.md and a single context-pack.md with per-repo sections.
 
+Explorers report decisions; they never take them. Every decision they surface goes to the orchestrator under Decisions Needed (see Role Permissions).
+
 Do not proceed to planning if exploration contains blocking UNKNOWNs.
 
 3. Impact Analysis
@@ -212,9 +216,12 @@ The plan must be phased. Each phase must include:
 
 objective
 difficulty (routine or hard)
+risk (normal or critical)
 scope
 out of scope
 expected files or modules
+allowed files (exact paths the executor may modify or create; the contract checker compares the diff against this list)
+contracts (cross-boundary names the phase introduces or consumes: endpoints, tables and columns, queues and events, config keys)
 steps
 required tests
 required evidence
@@ -223,7 +230,11 @@ stop conditions
 suggested agent
 handoff requirements
 
-Difficulty criteria: routine means mechanical or pattern-following work; hard means novel design, tricky invariants, or risky cross-cutting logic. The orchestrator uses this to pick the implementation model.
+Difficulty criteria: routine means mechanical or pattern-following work; hard means novel design, tricky invariants, or risky cross-cutting logic.
+
+Risk criteria: critical means the phase touches money (billing, payments, invoices), irreversible data changes or migrations, authentication or permissions, or a contract shared across repos. Everything else is normal.
+
+The orchestrator uses difficulty and risk to pick models (see Model Assignment).
 
 The planner must also write each phase as a self-contained file plan/phase-N.md next to plan.md. A phase file plus context-pack.md must be sufficient input for the implementation agent — no other artifact should be required for routine phases.
 
@@ -269,23 +280,43 @@ explicit stop conditions
 
 Do not give the implementation agent broad context unless necessary. Do not pass the full plan, brief, or impact report when a phase file exists — that is what the phase file is for.
 
-Launch phases marked hard with the session model (use the model override when launching the agent). Routine phases use the agent's default model.
+Choose the executor and model from Model Assignment. The executor's permissions come from Role Permissions, whatever model fills the role.
 
 It must produce or update implementation-handoff.md.
 
 Do not allow scope expansion.
 
-8. Review
+8. Contract Check
 
-Launch review-agent after each implementation phase.
+Launch contract-checker after each implementation phase, before review, at every triage level. It is the cheapest gate in the workflow and catches the failures that are most expensive to find later: calls to routes that do not exist, columns missing from the real database, queue names with no consumer.
 
 It receives:
 
+the assigned phase file (its Contracts field is the checklist)
+context-pack.md (its Contract Sources section)
+the artifact path contract-check.md
+
+If verdict is FAIL, send the failures straight back to the implementer as a focused fix, then re-run contract-checker. Do not spend a review on a phase that fails its contract check.
+If verdict is INCOMPLETE, decide whether the unchecked items matter for this phase; pass them to the reviewer as open risks, or resolve the missing contract source first.
+If verdict is PASS, continue.
+
+Contract-check fix cycles count toward the implementation gate's iteration limit.
+
+9. Review
+
+Launch review-agent after each phase passes its contract check.
+
+It acts as an adversarial reviewer and starts from a clean context (see Role Permissions). It receives:
+
 assigned phase
-implementation handoff
-relevant diff summary
+the plan's decisions that bear on this phase, including phases in other repos
+contract-check.md
+the diff range to inspect
 relevant tests
 relevant risks
+the implementation handoff's claims (files changed, verification results, deviations), labelled as claims to verify
+
+It never receives the implementer's reasoning or transcript, the orchestrator's opinion of the work, or earlier review verdicts. On a re-review after a fix, pass the list of findings to check, not the previous verdict.
 
 It must produce review.md.
 
@@ -293,7 +324,7 @@ If verdict is BLOCKED, send back to implementation or escalate.
 If APPROVED WITH CHANGES, request a focused fix.
 If APPROVED, continue.
 
-9. State Compression and Checkpoints
+10. State Compression and Checkpoints
 
 State compression is not optional on long tasks. Launch state-compressor at every checkpoint:
 
@@ -310,7 +341,7 @@ Use state.md as the main memory artifact for future steps.
 
 The chat history is not the source of truth. The artifacts are. Never depend on anything that exists only in chat history — if it matters, it must be in an artifact before the next checkpoint.
 
-10. Final Audit
+11. Final Audit
 
 Launch final-orchestrator-auditor before declaring the task complete.
 
@@ -341,14 +372,52 @@ the context-pack.md path when it exists; otherwise the context loading instructi
 
 The agent writes its full report to the artifact path and returns only a short summary: verdict or recommendation, key findings, and blocking unknowns — at most 15 lines. Do not let full reports flow back through the conversation. Read an artifact yourself only when a gate decision requires the detail.
 
-Model tiering:
+Role Permissions:
 
-Decision agents multiply their errors downstream; volume agents do not.
+A role is defined by what it is allowed to decide, not by what a model is good at. The model is a parameter of the role (see Model Assignment); a stronger model in a role gets no extra permissions. Enforce permissions with tools and output formats, not only with instructions: read-only roles get no edit tools, and every role's report has a place to hand a decision upward instead of taking it.
 
-- task-planner, plan-critic, review-agent, and final-orchestrator-auditor inherit the session model. Run orchestration sessions with the strongest reasoning model available: a better plan avoids correction cycles, and each avoided cycle costs two or more agent launches.
-- task-explorer, impact-analyzer, characterization-test-designer, and implementation-agent default to a mid-tier model — their work is volume, not judgment.
-- Override implementation-agent to the session model for phases marked hard in the plan.
-- state-compressor stays on the cheapest model.
+Decision levels:
+
+- D1 Product and data: business rules, user-visible behavior, whether existing data is correct or intentional, data repairs. Owner: the user; the orchestrator proposes options.
+- D2 Architecture and contracts: the approach to a fix, module boundaries, schema, public APIs, contracts shared across repos. Owner: the orchestrator, through the planner and the plan gate.
+- D3 Local design: helper extraction, naming, test structure, inside the allowed files and without changing a D1 or D2 decision. Owner: the executor.
+
+| Role | Agents | May | Must not | Stops and escalates when | Receives |
+| --- | --- | --- | --- | --- | --- |
+| Recon | task-explorer, impact-analyzer | Read code, docs, and read-only data; report facts labelled CONFIRMED / INFERRED / UNKNOWN; list options as hypotheses | Make D1 or D2 decisions; choose the solution; judge whether existing data is intentional | Evidence points to a decision: list it under Decisions Needed with options and evidence, without choosing | Brief, context loading rules, artifact paths |
+| Planner | task-planner | Make D2 decisions within the brief; close every decision the executor would need; name each phase's allowed files | Make D1 decisions; leave a D2 decision open for the executor | A business rule is ambiguous | Brief, exploration, impact |
+| Gate | plan-critic, final-orchestrator-auditor | Approve, reject, or demand changes | Edit plans or code | The verdict depends on a D1 decision | The artifacts under review |
+| Characterizer | characterization-test-designer | Write tests that freeze current behavior | Change production code or behavior | Current behavior looks wrong: record it as a finding, keep the test faithful to it | Phase file, impact, context pack |
+| Executor | implementation-agent, or an external executor | D3 decisions inside the phase's allowed files | Reinterpret scope; touch files outside the allowed list; change a D1 or D2 decision; commit | The phase contradicts itself or the code, is impossible, or a fact it states is false. On critical risk: stop. On normal risk: take the narrower reading and report it under Deviations | Phase file, context pack, characterization notes |
+| Contract checker | contract-checker | Mechanically verify references, verification commands, and that every changed file is in the allowed list | Judge design, quality, or intent; fix anything | — | Phase file, context pack |
+| Adversarial reviewer | review-agent | Try to break the implementation: counterexamples, new tests run against the base commit, re-running every claim; report findings with evidence | Fix, patch, or redesign; continue the implementer's work; review a phase it planned or implemented | A finding depends on context it was not given: mark it NEEDS CONTEXT instead of reporting a defect | Phase file, the plan's decisions including other repos' phases, contract-check.md, the diff, the handoff's claims. Never the implementer's reasoning, the orchestrator's opinion of the work, or earlier verdicts |
+| Compressor | state-compressor | Summarize artifacts | Add decisions or conclusions absent from the artifacts | — | The artifacts to compress |
+| Orchestrator | the session | D2 decisions; integrate, verify, and commit when the user asks | Take a D1 decision without the user; push a D2 decision onto an executor through a vague brief | — | Everything |
+
+Facts in a brief or phase file (counts, names, paths, expected values) are claims. Any role that can verify one cheaply does so, and reports a false one instead of copying it.
+
+Model Assignment:
+
+Decision roles multiply their errors downstream; volume roles do not; mechanical roles only need to be exact. Run orchestration sessions with the strongest reasoning model available. Tiers below: "session" is that model, "mid" is the mid-tier model (sonnet), "cheap" is the cheapest model (haiku), and "external" is a non-Claude coding agent driven by an executor skill (for example a Cursor delegate), used only when such a skill is installed.
+
+| Role | Default | Escalate to | Escalate when |
+| --- | --- | --- | --- |
+| Orchestrator, Gate | session | — | — |
+| Recon | mid | session | exploration of a FULL task returned blocking contradictions |
+| Planner | mid | session | triage FULL, or an EPIC roadmap |
+| Characterizer | mid | session | the flow under test is critical risk |
+| Executor | external, else mid | session | phase is hard and critical; for hard alone, use the executor's strongest setting or session |
+| Contract checker | cheap | — | — |
+| Adversarial reviewer | mid | session | phase is hard or critical, or triage FULL |
+| Compressor | cheap | — | — |
+
+The cheap tier may also fill Recon for evidence-only questions (counts, lookups, tracing a value); its findings still go through the orchestrator before anything is decided.
+
+Escalate by passing the model override when launching the agent. Record the executor and model used for each phase in state.md, so model trials and cost decisions have data.
+
+Cross-family review: when the implementer was a Claude model and the phase is critical, the external executor may run a second, read-only review in addition to review-agent. When the implementer was external, review-agent already provides that second family. Either way the reviewer is never the model instance that implemented the phase.
+
+Never downgrade a row below its default without user approval: a cheaper model on a decision step saves less than one correction cycle costs.
 
 Parallel launch rules:
 
@@ -407,6 +476,7 @@ impact is understood
 plan is approved
 characterization tests exist when required
 implementation handoff exists
+contract check passed
 review passed
 state is updated
 final audit passed
