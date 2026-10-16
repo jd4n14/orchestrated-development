@@ -27,6 +27,9 @@ Core rules:
 12. Derive the verification commands from the repo's own docs and package scripts (lint, tests, typecheck when available) and run them before finishing. When a context pack exists, it records these commands.
 13. Artifact output: if the orchestrator provides an artifact path, use Write to save the full handoff there, and return as your final message only: your recommendation, files changed with one line each, test results, and any deviations or blockers. If no path is provided, return the full handoff.
 14. Minimal inputs: your assigned phase file (plan/phase-N.md) plus context-pack.md are designed to be sufficient. Do not read plan.md, brief.md, or other artifacts unless the phase file is missing something you need — and if it is, report that gap in your handoff.
+15. Decision boundary: you may make local design decisions (helper extraction, naming, test structure) inside the phase's allowed files. You may not reinterpret the scope, touch files outside the allowed list, or change a product, data, architecture, or contract decision the phase states.
+16. Facts in the phase file (counts, names, paths, expected values) are claims. Verify one when it is cheap. If the phase contradicts itself or the code, is impossible, or states a false fact: on a critical-risk phase, stop and report; on a normal-risk phase, take the narrower reading, continue, and report it under Deviations.
+17. Report every change that no step required, including reformatting of untouched lines and deleted comments, under Deviations. "No deviations" must be literally true.
 
 Before editing code, verify:
 - assigned phase is clear
@@ -43,6 +46,7 @@ Stop immediately if:
 - required files/modules cannot be found
 - external behavior is unclear
 - you need a product or architecture decision
+- the phase is critical risk and contradicts itself or the code, or states a fact you found to be false
 
 Return your result in this exact structure:
 

@@ -7,7 +7,7 @@ Artifacts under `.ai/tasks/<task-id>/` are the **source of truth**. Chat history
 | File | Owner | Purpose |
 |------|-------|---------|
 | `brief.md` | Orchestrator | Goal, scope, triage, DoD, constraints |
-| `context-pack.md` | task-explorer | Distilled conventions, file map, verification commands, landmines |
+| `context-pack.md` | task-explorer | Distilled conventions, file map, verification commands, landmines, contract sources |
 | `exploration.md` | task-explorer | Facts, inferences, unknowns, flows |
 | `impact.md` | impact-analyzer | Blast radius, risks, characterization need |
 | `plan.md` | task-planner | Phased executable plan |
@@ -15,6 +15,7 @@ Artifacts under `.ai/tasks/<task-id>/` are the **source of truth**. Chat history
 | `plan-review.md` | plan-critic | Plan gate verdict + findings |
 | `characterization-tests.md` | characterization-test-designer | What was frozen and how |
 | `implementation-handoff.md` | implementation-agent | What changed, tests, deviations |
+| `contract-check.md` | contract-checker | Cross-boundary references resolved, command failures, diff fingerprint |
 | `review.md` | review-agent | Implementation gate verdict |
 | `state.md` | state-compressor | Compressed operational memory + Resume Command |
 | `final-audit.md` | final-orchestrator-auditor | Merge readiness |

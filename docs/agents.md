@@ -1,6 +1,6 @@
 # Agents
 
-Nine specialized Claude Code subagents. The **orchestrated-development** skill launches them; you can also invoke them directly for a single phase.
+Ten specialized Claude Code subagents. The **orchestrated-development** skill launches them; you can also invoke them directly for a single phase.
 
 All agent definitions live in [`agents/`](../agents/).
 
@@ -10,17 +10,18 @@ All agent definitions live in [`agents/`](../agents/).
 |-------|------|--------------------|--------------|
 | [`task-explorer`](../agents/task-explorer.md) | Reduce ambiguity before planning | sonnet | No (read-only + report) |
 | [`impact-analyzer`](../agents/impact-analyzer.md) | Blast radius, risks, characterization need | sonnet | No |
-| [`task-planner`](../agents/task-planner.md) | Phased executable plan | default | No |
+| [`task-planner`](../agents/task-planner.md) | Phased executable plan | sonnet | No |
 | [`plan-critic`](../agents/plan-critic.md) | Break the plan before coding | default | No |
 | [`characterization-test-designer`](../agents/characterization-test-designer.md) | Freeze current behavior with tests | sonnet | Tests only |
 | [`implementation-agent`](../agents/implementation-agent.md) | Implement **one** approved phase | sonnet | Yes |
-| [`review-agent`](../agents/review-agent.md) | Audit implementation vs plan | default | No |
+| [`contract-checker`](../agents/contract-checker.md) | Prove cross-boundary references exist | haiku | No |
+| [`review-agent`](../agents/review-agent.md) | Audit implementation vs plan | sonnet | No |
 | [`state-compressor`](../agents/state-compressor.md) | Compress operational memory | haiku | No |
 | [`final-orchestrator-auditor`](../agents/final-orchestrator-auditor.md) | Merge readiness decision | default | No |
 
 Model hints are preferences in frontmatter; Claude Code may map them differently depending on your account settings.
 
-The tiering is deliberate: **decision agents** (planner, critic, reviewer, auditor) use `default` — they inherit the session model, so run orchestration sessions with the strongest reasoning model available (Opus / Fable-class). **Volume agents** (explorer, impact, characterization, implementer) stay on sonnet; the orchestrator overrides the implementer to the session model for phases the plan marks as `hard`. A stronger model at decision points avoids gate correction cycles, and each avoided cycle saves two or more agent launches.
+Each agent fills a role with fixed decision permissions ([role permissions](workflow.md#role-permissions)); the model never widens them. The frontmatter model is the default; the orchestrator escalates per phase from [model assignment](workflow.md#model-assignment). **Gate agents** (plan-critic, auditor) use `default` — they inherit the session model, so run orchestration sessions with the strongest reasoning model available (Opus / Fable-class). **Volume agents** (explorer, impact, planner, characterization, implementer, reviewer) stay on sonnet and are escalated to the session model when the phase is hard, critical, or the triage is FULL. **Mechanical agents** (contract-checker, state-compressor) run on haiku: they need exactness, not judgment.
 
 ## task-explorer
 
@@ -72,15 +73,26 @@ The tiering is deliberate: **decision agents** (planner, critic, reviewer, audit
 
 **Outputs:** code changes + `implementation-handoff.md` (files, tests run, deviations, blockers).
 
-**Does not:** expand scope, invent architecture, or skip characterization when required.
+**Does not:** expand scope, touch files outside the phase's allowed list, change product or architecture decisions, or skip characterization when required. Makes only local design choices; stops on a contradiction or a false fact in a critical phase.
+
+## contract-checker
+
+**When:** After each implementation phase, before review, at every triage level.
+
+**Outputs:** `contract-check.md` — every HTTP call, table/column, queue/event name, config key, and untyped symbol in the diff, each with the file:line or command output that proves it exists (or MISSING); failing verification commands; a scope check of diff files against the phase's allowed files; a diff fingerprint. Verdict `PASS` / `FAIL` / `INCOMPLETE`.
+
+**Does:** read the real database schema only through a read-only command recorded in the context pack.  
+**Does not:** judge design or scope, fix anything, or read secrets.
 
 ## review-agent
 
-**When:** After each implementation phase.
+**When:** After each phase passes its contract check.
 
-**Outputs:** `review.md` with the same verdict model as plan-critic.
+**Outputs:** `review.md` with the same verdict model as plan-critic, findings with evidence and a `DEFECT` / `NEEDS CONTEXT` status, and a check of every handoff claim.
 
-**Does:** re-run verification commands; inspect real diffs.  
+**Works as:** an adversarial reviewer from a clean context — it gets the plan's decisions and the diff, never the implementer's reasoning, and tries to break the change instead of grading it.
+
+**Does:** inspect real diffs; reuse the contract check's command results when its diff fingerprint matches, otherwise re-run them.  
 **Does not:** implement fixes unless explicitly asked.
 
 ## state-compressor

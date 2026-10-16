@@ -5,7 +5,7 @@ This package is designed for **[Claude Code](https://docs.anthropic.com/en/docs/
 It installs as:
 
 1. One **skill** — `orchestrated-development`
-2. Nine **agents** — specialized subagents used by the skill
+2. Ten **agents** — specialized subagents used by the skill
 
 ## Prerequisites
 
@@ -89,7 +89,7 @@ User-level:
 
 ```bash
 rm -rf ~/.claude/skills/orchestrated-development
-rm -f ~/.claude/agents/{task-explorer,impact-analyzer,task-planner,plan-critic,characterization-test-designer,implementation-agent,review-agent,state-compressor,final-orchestrator-auditor}.md
+rm -f ~/.claude/agents/{task-explorer,impact-analyzer,task-planner,plan-critic,characterization-test-designer,implementation-agent,contract-checker,review-agent,state-compressor,final-orchestrator-auditor}.md
 ```
 
 Project-level: remove the corresponding files under `.claude/skills` and `.claude/agents`.
